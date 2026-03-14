@@ -32,14 +32,15 @@
     }
   },
   "submit": {
-    "production": {
-      "ios": {
-        "appleId": "YOUR_APPLE_ID",
-        "ascAppId": "YOUR_ASC_APP_ID"
-      },
+    "production": {}
+  },
+  "projects": {
+    "86f41b1d-4dd0-4fda-a877-a228b718e1f6": {
       "android": {
-        "serviceAccountKeyPath": "./path-to-service-account.json",
-        "track": "production"
+        "package": "com.smartpet.app"
+      },
+      "ios": {
+        "bundleIdentifier": "com.smartpet.app"
       }
     }
   }
