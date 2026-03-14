@@ -3,7 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Text, View, StyleSheet } from 'react-native';
-import { FeederScreen, WaterScreen, SettingsScreen } from './src/screens';
+import { FeederScreen, WaterScreen, SettingsScreen, TrackerScreen } from './src/screens';
 import { COLORS } from './src/constants';
 
 const Tab = createBottomTabNavigator();
@@ -27,6 +27,13 @@ export default function App() {
           tabBarLabelStyle: styles.tabLabel,
         }}
       >
+        <Tab.Screen
+          name="Tracker"
+          component={TrackerScreen}
+          options={{
+            tabBarIcon: ({ focused }) => <TabIcon icon="📍" focused={focused} />,
+          }}
+        />
         <Tab.Screen
           name="Feeder"
           component={FeederScreen}
