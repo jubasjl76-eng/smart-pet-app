@@ -1,65 +1,146 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, Linking } from 'react-native';
-import { Button } from '../components';
-import { COLORS, SPACING, FONT_SIZES } from '../constants';
-import { checkHealth } from '../services/api';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Switch } from 'react-native';
+import { COLORS, SPACING, RADIUS, SHADOWS } from '../constants';
 
 export const SettingsScreen: React.FC = () => {
-  const handleTestConnection = async () => {
-    const isHealthy = await checkHealth();
-    if (isHealthy) {
-      Alert.alert('Success', 'Connected to API successfully! ✅');
-    } else {
-      Alert.alert('Error', 'Could not connect to API. Make sure the server is running.');
-    }
-  };
+  const [notifications, setNotifications] = React.useState(true);
+  const [lowFoodAlerts, setLowFoodAlerts] = React.useState(true);
+  const [lowWaterAlerts, setLowWaterAlerts] = React.useState(true);
+  const [geofenceAlerts, setGeofenceAlerts] = React.useState(true);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>⚙️ Settings</Text>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Connection</Text>
-        <Button
-          title="Test API Connection"
-          onPress={handleTestConnection}
-          variant="outline"
-          style={styles.button}
-        />
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>⚙️ Settings</Text>
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>API Configuration</Text>
-        <View style={styles.configItem}>
-          <Text style={styles.configLabel}>Feeder API</Text>
-          <Text style={styles.configValue}>http://localhost:3002/api</Text>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Profile Section */}
+        <View style={styles.card}>
+          <View style={styles.profileRow}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>M</Text>
+            </View>
+            <View style={styles.profileInfo}>
+              <Text style={styles.profileName}>Marco</Text>
+              <Text style={styles.profileEmail}>marco@test.com</Text>
+            </View>
+          </View>
+          <TouchableOpacity style={styles.editButton}>
+            <Text style={styles.editButtonText}>Edit</Text>
+          </TouchableOpacity>
         </View>
-        <View style={styles.configItem}>
-          <Text style={styles.configLabel}>Water API</Text>
-          <Text style={styles.configValue}>http://localhost:3003/api</Text>
+
+        {/* Notifications */}
+        <Text style={styles.sectionTitle}>Notifications</Text>
+        <View style={styles.card}>
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>Push Notifications</Text>
+              <Text style={styles.settingDesc}>Receive alerts on your device</Text>
+            </View>
+            <Switch
+              value={notifications}
+              onValueChange={setNotifications}
+              trackColor={{ false: COLORS.surfaceSecondary, true: COLORS.primaryLight }}
+              thumbColor="#fff"
+            />
+          </View>
+          
+          <View style={styles.divider} />
+          
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>Low Food Alerts</Text>
+              <Text style={styles.settingDesc}>Alert when food is below 20%</Text>
+            </View>
+            <Switch
+              value={lowFoodAlerts}
+              onValueChange={setLowFoodAlerts}
+              trackColor={{ false: COLORS.surfaceSecondary, true: COLORS.primaryLight }}
+              thumbColor="#fff"
+            />
+          </View>
+          
+          <View style={styles.divider} />
+          
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>Low Water Alerts</Text>
+              <Text style={styles.settingDesc}>Alert when water is below 20%</Text>
+            </View>
+            <Switch
+              value={lowWaterAlerts}
+              onValueChange={setLowWaterAlerts}
+              trackColor={{ false: COLORS.surfaceSecondary, true: COLORS.primaryLight }}
+              thumbColor="#fff"
+            />
+          </View>
+          
+          <View style={styles.divider} />
+          
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>Geofence Alerts</Text>
+              <Text style={styles.settingDesc}>Alert when pet leaves safe zone</Text>
+            </View>
+            <Switch
+              value={geofenceAlerts}
+              onValueChange={setGeofenceAlerts}
+              trackColor={{ false: COLORS.surfaceSecondary, true: COLORS.primaryLight }}
+              thumbColor="#fff"
+            />
+          </View>
         </View>
-      </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>About</Text>
-        <Text style={styles.aboutText}>
-          Smart Pet App v1.0.0
-        </Text>
-        <Text style={styles.aboutSubtext}>
-          Control your smart pet feeder and water dispenser from anywhere.
-        </Text>
-      </View>
+        {/* Device Settings */}
+        <Text style={styles.sectionTitle}>Device</Text>
+        <View style={styles.card}>
+          <TouchableOpacity style={styles.menuRow}>
+            <Text style={styles.menuLabel}>Refresh Interval</Text>
+            <View style={styles.menuRight}>
+              <Text style={styles.menuValue}>30 sec</Text>
+              <Text style={styles.menuArrow}>›</Text>
+            </View>
+          </TouchableOpacity>
+          
+          <View style={styles.divider} />
+          
+          <TouchableOpacity style={styles.menuRow}>
+            <Text style={styles.menuLabel}>Battery Saver Mode</Text>
+            <View style={styles.menuRight}>
+              <Text style={styles.menuValue}>Off</Text>
+              <Text style={styles.menuArrow}>›</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Help</Text>
-        <Text style={styles.helpText}>
-          • Make sure your devices are powered on{'\n'}
-          • Ensure your phone is on the same network{'\n'}
-          • Start the backend servers before using the app{'\n'}
-          • Check GitHub for full documentation
-        </Text>
-      </View>
-    </ScrollView>
+        {/* Account */}
+        <Text style={styles.sectionTitle}>Account</Text>
+        <View style={styles.card}>
+          <TouchableOpacity style={styles.menuRow}>
+            <Text style={styles.menuLabel}>Change Password</Text>
+            <Text style={styles.menuArrow}>›</Text>
+          </TouchableOpacity>
+          
+          <View style={styles.divider} />
+          
+          <TouchableOpacity style={styles.menuRow}>
+            <Text style={styles.menuLabel}>Help & Support</Text>
+            <Text style={styles.menuArrow}>›</Text>
+          </TouchableOpacity>
+          
+          <View style={styles.divider} />
+          
+          <TouchableOpacity style={styles.menuRow}>
+            <Text style={[styles.menuLabel, { color: COLORS.danger }]}>Log Out</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Version */}
+        <Text style={styles.version}>Smart Pet v1.0.0</Text>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
@@ -68,60 +149,129 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  content: {
-    padding: SPACING.md,
+  header: {
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.md,
+    paddingBottom: SPACING.sm,
   },
   title: {
-    fontSize: FONT_SIZES.xxl,
-    fontWeight: 'bold',
+    fontSize: 28,
+    fontWeight: '700',
     color: COLORS.text,
-    marginBottom: SPACING.lg,
   },
-  section: {
-    marginBottom: SPACING.lg,
+  content: {
+    flex: 1,
+    paddingHorizontal: SPACING.lg,
   },
-  sectionTitle: {
-    fontSize: FONT_SIZES.md,
-    fontWeight: '600',
-    color: COLORS.textSecondary,
-    marginBottom: SPACING.sm,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  button: {
-    marginTop: SPACING.xs,
-  },
-  configItem: {
+  card: {
     backgroundColor: COLORS.surface,
-    borderRadius: 12,
+    borderRadius: RADIUS.lg,
     padding: SPACING.md,
     marginBottom: SPACING.sm,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    ...SHADOWS.small,
   },
-  configLabel: {
-    color: COLORS.textSecondary,
-    fontSize: FONT_SIZES.sm,
-    marginBottom: 4,
+  profileRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  configValue: {
-    color: COLORS.text,
-    fontSize: FONT_SIZES.md,
-    fontFamily: 'monospace',
+  avatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: COLORS.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  aboutText: {
-    color: COLORS.text,
-    fontSize: FONT_SIZES.lg,
+  avatarText: {
+    fontSize: 24,
     fontWeight: '600',
+    color: '#fff',
   },
-  aboutSubtext: {
-    color: COLORS.textSecondary,
-    fontSize: FONT_SIZES.sm,
-    marginTop: SPACING.xs,
+  profileInfo: {
+    flex: 1,
+    marginLeft: SPACING.md,
   },
-  helpText: {
-    color: COLORS.textSecondary,
-    fontSize: FONT_SIZES.sm,
-    lineHeight: 22,
+  profileName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+  profileEmail: {
+    fontSize: 14,
+    color: COLORS.textMuted,
+    marginTop: 2,
+  },
+  editButton: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+    backgroundColor: COLORS.surfaceSecondary,
+    borderRadius: RADIUS.md,
+  },
+  editButtonText: {
+    fontSize: 14,
+    color: COLORS.primary,
+    fontWeight: '500',
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.textMuted,
+    marginTop: SPACING.lg,
+    marginBottom: SPACING.xs,
+    marginLeft: SPACING.xs,
+  },
+  settingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: SPACING.xs,
+  },
+  settingInfo: {
+    flex: 1,
+  },
+  settingLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: COLORS.text,
+  },
+  settingDesc: {
+    fontSize: 13,
+    color: COLORS.textMuted,
+    marginTop: 2,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: COLORS.border,
+    marginVertical: SPACING.xs,
+  },
+  menuRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: SPACING.xs,
+  },
+  menuLabel: {
+    fontSize: 16,
+    color: COLORS.text,
+  },
+  menuRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  menuValue: {
+    fontSize: 14,
+    color: COLORS.textMuted,
+    marginRight: SPACING.xs,
+  },
+  menuArrow: {
+    fontSize: 20,
+    color: COLORS.textMuted,
+  },
+  version: {
+    textAlign: 'center',
+    fontSize: 13,
+    color: COLORS.textMuted,
+    marginTop: SPACING.xl,
+    marginBottom: SPACING.xl,
   },
 });

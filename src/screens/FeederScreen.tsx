@@ -1,172 +1,101 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, Alert } from 'react-native';
-import { StatusCard, Button, ScheduleCard } from '../components';
-import { COLORS, SPACING, FONT_SIZES } from '../constants';
-import { feederApi } from '../services/api';
-import { Feeder, Schedule } from '../types';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView } from 'react-native';
+import { COLORS, SPACING, RADIUS, SHADOWS } from '../constants';
 
 export const FeederScreen: React.FC = () => {
-  const [feeder, setFeeder] = useState<Feeder | null>(null);
-  const [schedules, setSchedules] = useState<Schedule[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [feeding, setFeeding] = useState(false);
 
-  const fetchData = useCallback(async () => {
-    try {
-      const [feedersData, schedulesData] = await Promise.all([
-        feederApi.get<{ feeders: Feeder[] }>('/feeders'),
-        feederApi.get<{ schedules: Schedule[] }>('/schedule'),
-      ]);
-      
-      if (feedersData.feeders.length > 0) {
-        setFeeder(feedersData.feeders[0]);
-      }
-      setSchedules(schedulesData.schedules || []);
-    } catch (error) {
-      console.error('Failed to fetch feeder data:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    fetchData();
-  }, [fetchData]);
-
-  const handleFeed = async () => {
-    if (!feeder) return;
-    
+  const handleFeed = () => {
     setFeeding(true);
-    try {
-      await feederApi.post('/feed', { feeder_id: feeder.id, type: 'manual' });
-      Alert.alert('Success', 'Food dispensed! 🍖');
-    } catch (error) {
-      Alert.alert('Error', 'Failed to dispense food');
-    } finally {
-      setFeeding(false);
-    }
+    setTimeout(() => setFeeding(false), 2000);
   };
 
-  const handleToggleSchedule = async (id: string, enabled: boolean) => {
-    try {
-      await feederApi.put(`/schedule/${id}`, { enabled });
-      setSchedules(prev => 
-        prev.map(s => s.id === id ? { ...s, enabled } : s)
-      );
-    } catch (error) {
-      Alert.alert('Error', 'Failed to update schedule');
-    }
-  };
+  const feeders = [
+    { id: '1', name: 'Living Room', foodLevel: 75, status: 'online' },
+    { id: '2', name: 'Kitchen', foodLevel: 45, status: 'online' },
+    { id: '3', name: 'Bedroom', foodLevel: 20, status: 'low' },
+  ];
 
-  const handleDeleteSchedule = async (id: string) => {
-    try {
-      await feederApi.delete(`/schedule/${id}`);
-      setSchedules(prev => prev.filter(s => s.id !== id));
-    } catch (error) {
-      Alert.alert('Error', 'Failed to delete schedule');
-    }
+  const getFoodColor = (level: number) => {
+    if (level < 25) return COLORS.danger;
+    if (level < 50) return COLORS.warning;
+    return COLORS.success;
   };
-
-  const getFoodStatus = () => {
-    if (!feeder) return 'neutral';
-    if (feeder.foodLevel < 20) return 'danger';
-    if (feeder.foodLevel < 50) return 'warning';
-    return 'good';
-  };
-
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.loadingText}>Loading...</Text>
-      </View>
-    );
-  }
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          tintColor={COLORS.primary}
-        />
-      }
-    >
-      <Text style={styles.title}>🐶 Smart Feeder</Text>
-      
-      {feeder ? (
-        <>
-          <View style={styles.statusGrid}>
-            <StatusCard
-              title="Food Level"
-              value={feeder.foodLevel}
-              unit="%"
-              icon="🍖"
-              status={getFoodStatus()}
-            />
-          </View>
-          
-          <View style={styles.statsRow}>
-            <StatusCard
-              title="WiFi"
-              value={feeder.wifiRssi}
-              unit="dBm"
-              icon="📶"
-              status="neutral"
-            />
-            <StatusCard
-              title="Uptime"
-              value={Math.floor(feeder.uptimeMs / 3600000)}
-              unit="hrs"
-              icon="⏱️"
-              status="neutral"
-            />
-          </View>
-
-          <Button
-            title={feeding ? 'Dispensing...' : '🍖 Feed Now'}
-            onPress={handleFeed}
-            loading={feeding}
-            variant="primary"
-            size="large"
-            style={styles.feedButton}
-          />
-        </>
-      ) : (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>No feeder connected</Text>
-          <Text style={styles.emptySubtext}>Power on your feeder to see status</Text>
-        </View>
-      )}
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>⏰ Feeding Schedule</Text>
-        {schedules.length > 0 ? (
-          schedules.map(schedule => (
-            <ScheduleCard
-              key={schedule.id}
-              id={schedule.id}
-              hour={schedule.hour}
-              minute={schedule.minute}
-              enabled={schedule.enabled}
-              onToggle={handleToggleSchedule}
-              onDelete={handleDeleteSchedule}
-            />
-          ))
-        ) : (
-          <Text style={styles.emptySubtext}>No schedules set</Text>
-        )}
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>🐶 Feeders</Text>
+        <Text style={styles.subtitle}>{feeders.length} devices</Text>
       </View>
-    </ScrollView>
+
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Main Feed Button */}
+        <TouchableOpacity 
+          style={[styles.feedButton, feeding && styles.feedButtonActive]} 
+          onPress={handleFeed}
+          disabled={feeding}
+        >
+          <Text style={styles.feedButtonIcon}>🍖</Text>
+          <Text style={styles.feedButtonText}>
+            {feeding ? 'Feeding...' : 'Feed Now'}
+          </Text>
+        </TouchableOpacity>
+
+        {/* Feeders List */}
+        <Text style={styles.sectionTitle}>Your Feeders</Text>
+        
+        {feeders.map((feeder) => (
+          <View key={feeder.id} style={styles.deviceCard}>
+            <View style={styles.deviceHeader}>
+              <View style={styles.deviceInfo}>
+                <Text style={styles.deviceName}>{feeder.name}</Text>
+                <View style={styles.statusBadge}>
+                  <View style={[styles.statusDot, { backgroundColor: feeder.status === 'online' ? COLORS.online : COLORS.offline }]} />
+                  <Text style={styles.statusText}>{feeder.status}</Text>
+                </View>
+              </View>
+              <TouchableOpacity style={styles.actionButton}>
+                <Text>⋯</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.levelContainer}>
+              <View style={styles.levelBar}>
+                <View 
+                  style={[
+                    styles.levelFill, 
+                    { 
+                      width: `${feeder.foodLevel}%`,
+                      backgroundColor: getFoodColor(feeder.foodLevel)
+                    }
+                  ]} 
+                />
+              </View>
+              <Text style={[styles.levelText, { color: getFoodColor(feeder.foodLevel) }]}>
+                {feeder.foodLevel}%
+              </Text>
+            </View>
+          </View>
+        ))}
+
+        {/* Quick Stats */}
+        <View style={styles.statsRow}>
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>3</Text>
+            <Text style={styles.statLabel}>Devices</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={[styles.statValue, { color: COLORS.success }]}>2</Text>
+            <Text style={styles.statLabel}>Online</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={[styles.statValue, { color: COLORS.warning }]}>1</Text>
+            <Text style={styles.statLabel}>Low Food</Text>
+          </View>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
@@ -175,51 +104,136 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  content: {
-    padding: SPACING.md,
+  header: {
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.md,
+    paddingBottom: SPACING.sm,
   },
   title: {
-    fontSize: FONT_SIZES.xxl,
-    fontWeight: 'bold',
+    fontSize: 28,
+    fontWeight: '700',
     color: COLORS.text,
-    marginBottom: SPACING.lg,
   },
-  loadingText: {
+  subtitle: {
+    fontSize: 14,
+    color: COLORS.textMuted,
+    marginTop: 2,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: SPACING.lg,
+  },
+  feedButton: {
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.lg,
+    paddingVertical: SPACING.lg,
+    alignItems: 'center',
+    marginVertical: SPACING.md,
+    ...SHADOWS.medium,
+  },
+  feedButtonActive: {
+    backgroundColor: COLORS.primaryDark,
+  },
+  feedButtonIcon: {
+    fontSize: 32,
+    marginBottom: SPACING.xs,
+  },
+  feedButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
     color: COLORS.text,
-    textAlign: 'center',
-    marginTop: SPACING.xl,
+    marginTop: SPACING.lg,
+    marginBottom: SPACING.sm,
   },
-  statusGrid: {
-    marginBottom: SPACING.md,
+  deviceCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.md,
+    marginBottom: SPACING.sm,
+    ...SHADOWS.small,
+  },
+  deviceHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: SPACING.sm,
+  },
+  deviceInfo: {
+    flex: 1,
+  },
+  deviceName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 6,
+  },
+  statusText: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+    textTransform: 'capitalize',
+  },
+  actionButton: {
+    padding: SPACING.xs,
+  },
+  levelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  levelBar: {
+    flex: 1,
+    height: 8,
+    backgroundColor: COLORS.surfaceSecondary,
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginRight: SPACING.sm,
+  },
+  levelFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  levelText: {
+    fontSize: 14,
+    fontWeight: '600',
+    width: 45,
+    textAlign: 'right',
   },
   statsRow: {
     flexDirection: 'row',
-    gap: SPACING.md,
-  },
-  feedButton: {
+    gap: SPACING.sm,
     marginTop: SPACING.lg,
-    marginBottom: SPACING.lg,
+    marginBottom: SPACING.xl,
   },
-  section: {
-    marginTop: SPACING.lg,
-  },
-  sectionTitle: {
-    fontSize: FONT_SIZES.lg,
-    fontWeight: '600',
-    color: COLORS.text,
-    marginBottom: SPACING.md,
-  },
-  emptyState: {
+  statCard: {
+    flex: 1,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
     alignItems: 'center',
-    padding: SPACING.xl,
+    ...SHADOWS.small,
   },
-  emptyText: {
-    fontSize: FONT_SIZES.lg,
-    color: COLORS.textSecondary,
+  statValue: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: COLORS.text,
   },
-  emptySubtext: {
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.textSecondary,
-    marginTop: SPACING.xs,
+  statLabel: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+    marginTop: 2,
   },
 });

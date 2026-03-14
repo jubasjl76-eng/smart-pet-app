@@ -1,28 +1,31 @@
-// API Configuration
-export const API_CONFIG = {
-  FEEDER_BASE_URL: 'http://localhost:3002/api',
-  WATER_BASE_URL: 'http://localhost:3003/api',
-  API_KEY: 'your-api-key-here',
-  TIMEOUT: 10000,
-};
-
+// Light Theme Colors
 export const COLORS = {
   primary: '#6366f1',
+  primaryLight: '#818cf8',
   primaryDark: '#4f46e5',
-  secondary: '#10b981',
-  danger: '#ef4444',
-  warning: '#f59e0b',
-  background: '#0f172a',
-  surface: '#1e293b',
-  surfaceLight: '#334155',
-  text: '#f8fafc',
-  textSecondary: '#94a3b8',
-  border: '#475569',
   
-  // Status colors
+  // Light theme - clean background
+  background: '#f8fafc',
+  surface: '#ffffff',
+  surfaceSecondary: '#f1f5f9',
+  
+  // Text
+  text: '#1e293b',
+  textSecondary: '#64748b',
+  textMuted: '#94a3b8',
+  
+  // Accents
   success: '#22c55e',
-  error: '#ef4444',
+  warning: '#f59e0b',
+  danger: '#ef4444',
   info: '#3b82f6',
+  
+  // Borders
+  border: '#e2e8f0',
+  
+  // Device status
+  online: '#22c55e',
+  offline: '#94a3b8',
 };
 
 export const SPACING = {
@@ -37,7 +40,32 @@ export const FONT_SIZES = {
   xs: 12,
   sm: 14,
   md: 16,
-  lg: 20,
+  lg: 18,
   xl: 24,
   xxl: 32,
+};
+
+export const SHADOWS = {
+  small: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  medium: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+};
+
+export const RADIUS = {
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 24,
+  full: 9999,
 };
