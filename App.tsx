@@ -2,16 +2,16 @@ import React from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { Text, View, StyleSheet } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { View, Text, StyleSheet } from 'react-native';
 import { FeederScreen, WaterScreen, SettingsScreen, TrackerScreen } from './src/screens';
 import { COLORS } from './src/constants';
 
 const Tab = createBottomTabNavigator();
 
-const TabIcon = ({ icon, focused }: { icon: string; focused: boolean }) => (
+const TabIcon = ({ label, focused }: { label: string; focused: boolean }) => (
   <View style={styles.iconContainer}>
-    <Text style={[styles.icon, focused && styles.iconFocused]}>{icon}</Text>
+    <Text style={[styles.icon, focused && styles.iconFocused]}>{label}</Text>
   </View>
 );
 
@@ -33,28 +33,31 @@ function AppContent() {
           component={TrackerScreen}
           options={{
             tabBarLabel: 'GPS',
-            tabBarIcon: ({ focused }) => <TabIcon icon="📍" focused={focused} />,
+            tabBarIcon: ({ focused }) => <TabIcon label="📍" focused={focused} />,
           }}
         />
         <Tab.Screen
           name="Feeder"
           component={FeederScreen}
           options={{
-            tabBarIcon: ({ focused }) => <TabIcon icon="🐶" focused={focused} />,
+            tabBarLabel: 'Food',
+            tabBarIcon: ({ focused }) => <TabIcon label="🍖" focused={focused} />,
           }}
         />
         <Tab.Screen
           name="Water"
           component={WaterScreen}
           options={{
-            tabBarIcon: ({ focused }) => <TabIcon icon="💧" focused={focused} />,
+            tabBarLabel: 'Water',
+            tabBarIcon: ({ focused }) => <TabIcon label="💧" focused={focused} />,
           }}
         />
         <Tab.Screen
           name="Settings"
           component={SettingsScreen}
           options={{
-            tabBarIcon: ({ focused }) => <TabIcon icon="⚙️" focused={focused} />,
+            tabBarLabel: 'Settings',
+            tabBarIcon: ({ focused }) => <TabIcon label="⚙️" focused={focused} />,
           }}
         />
       </Tab.Navigator>
@@ -88,7 +91,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   icon: {
-    fontSize: 22,
+    fontSize: 20,
   },
   iconFocused: {
     transform: [{ scale: 1.1 }],
