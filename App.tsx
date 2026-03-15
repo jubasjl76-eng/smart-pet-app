@@ -4,7 +4,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { View, Text, StyleSheet } from 'react-native';
-import { FeederScreen, WaterScreen, SettingsScreen, TrackerScreen } from './src/screens';
+import { HomeScreen, FeederScreen, WaterScreen, SettingsScreen, TrackerScreen, CameraScreen, SensorsScreen } from './src/screens';
 import { COLORS } from './src/constants';
 
 const Tab = createBottomTabNavigator();
@@ -28,6 +28,30 @@ function AppContent() {
           tabBarLabelStyle: styles.tabLabel,
         }}
       >
+        <Tab.Screen
+          name="Home"
+          component={HomeScreen}
+          options={{
+            tabBarLabel: 'Home',
+            tabBarIcon: ({ focused }) => <TabIcon label="🏠" focused={focused} />,
+          }}
+        />
+        <Tab.Screen
+          name="Sensors"
+          component={SensorsScreen}
+          options={{
+            tabBarLabel: 'Sensors',
+            tabBarIcon: ({ focused }) => <TabIcon label="📡" focused={focused} />,
+          }}
+        />
+        <Tab.Screen
+          name="Cameras"
+          component={CameraScreen}
+          options={{
+            tabBarLabel: 'Cams',
+            tabBarIcon: ({ focused }) => <TabIcon label="📹" focused={focused} />,
+          }}
+        />
         <Tab.Screen
           name="Tracker"
           component={TrackerScreen}
