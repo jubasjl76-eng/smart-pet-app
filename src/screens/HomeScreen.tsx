@@ -1,192 +1,236 @@
 /**
- * Home Screen - Overview Dashboard for Pet Owners
+ * Home — pet name + claim code. No onboard funnel.
  */
 
-import { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  StyleSheet,
+  RefreshControl,
+  TextInput,
+  Alert,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-interface DeviceStatus {
-  feeders: { count: number; lastFeeding: string };
-  water: { level: number; lastDispense: string };
-  cameras: { online: number; total: number };
-  sensors: { temperature: number; humidity: number; doorOpen: boolean };
-}
+import { COLORS, SPACING, RADIUS, SHADOWS } from '../constants';
+import { api, errorMessage, isDeviceOffline, isFoodLow } from '../services/api';
+import { useSession } from '../lib/useSession';
+import type { Device } from '../types';
 
 export function HomeScreen() {
-  const [status, setStatus] = useState<DeviceStatus | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { isLoggedIn } = useSession();
+  const [petName, setPetName] = useState('');
+  const [claimCode, setClaimCode] = useState('');
+  const [devices, setDevices] = useState<Device[]>([]);
+  const [claiming, setClaiming] = useState(false);
+  const [savingPet, setSavingPet] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [statusNote, setStatusNote] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    if (!isLoggedIn) {
+      setDevices([]);
+      return;
+    }
+    try {
+      const pet = await api.getPet();
+      if (pet?.name) setPetName(pet.name);
+    } catch {
+      // GET /api/pet may 404 — keep local name
+    }
+    try {
+      setDevices(await api.getDevices());
+    } catch (err) {
+      setStatusNote(errorMessage(err, 'Could not load devices'));
+    }
+  }, [isLoggedIn]);
 
   useEffect(() => {
-    loadStatus();
-    const interval = setInterval(loadStatus, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const loadStatus = async () => {
-    // Mock data - would connect to backend API
-    setStatus({
-      feeders: { count: 2, lastFeeding: '2 hours ago' },
-      water: { level: 75, lastDispense: '30 min ago' },
-      cameras: { online: 3, total: 4 },
-      sensors: { temperature: 22.5, humidity: 45, doorOpen: false },
-    });
-    setLoading(false);
-  };
+    load();
+  }, [load]);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadStatus();
+    setStatusNote(null);
+    await load();
     setRefreshing(false);
   };
 
-  if (loading || !status) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <Text style={styles.loading}>Loading...</Text>
-      </SafeAreaView>
-    );
-  }
+  const savePetName = async () => {
+    const name = petName.trim();
+    setPetName(name);
+    setSavingPet(true);
+    try {
+      await api.putPet(name);
+    } catch {
+      // local fallback if GET/PUT /api/pet 404s
+    } finally {
+      setSavingPet(false);
+    }
+  };
+
+  const claim = async () => {
+    const code = claimCode.trim();
+    if (!code) {
+      Alert.alert('Claim code', 'Enter the feeder claim code.');
+      return;
+    }
+    if (!isLoggedIn) {
+      Alert.alert('Sign in', 'Log in from Settings before claiming a feeder.');
+      return;
+    }
+    setClaiming(true);
+    setStatusNote(null);
+    try {
+      await api.claimDevice(code);
+      setClaimCode('');
+      setDevices(await api.getDevices());
+    } catch (err) {
+      Alert.alert('Claim failed', errorMessage(err, 'Could not claim device'));
+    } finally {
+      setClaiming(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        keyboardShouldPersistTaps="handled"
       >
         <Text style={styles.title}>🐾 Smart Pet</Text>
-        <Text style={styles.subtitle}>Your pet's home is safe</Text>
+        <Text style={styles.subtitle}>{petName.trim() || 'Name your pet, then claim a feeder'}</Text>
 
-        {/* Quick Status */}
-        <View style={styles.quickStatus}>
-          <QuickStatusCard
-            icon="🌡️"
-            value={`${status.sensors.temperature}°C`}
-            label="Temperature"
-            status="normal"
+        <View style={styles.card}>
+          <Text style={styles.label}>Pet name</Text>
+          <TextInput
+            style={styles.input}
+            value={petName}
+            onChangeText={setPetName}
+            onEndEditing={savePetName}
+            placeholder="e.g. Luna"
+            placeholderTextColor={COLORS.textMuted}
+            autoCapitalize="words"
           />
-          <QuickStatusCard
-            icon="💧"
-            value={`${status.sensors.humidity}%`}
-            label="Humidity"
-            status="normal"
-          />
-          <QuickStatusCard
-            icon="🚪"
-            value={status.sensors.doorOpen ? 'Open' : 'Closed'}
-            label="Door"
-            status={status.sensors.doorOpen ? 'warning' : 'normal'}
-          />
-        </View>
-
-        {/* Device Summary */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📱 Devices</Text>
-          
-          <TouchableOpacity style={styles.deviceCard}>
-            <View style={styles.deviceIcon}>
-              <Text style={styles.iconText}>🍖</Text>
-            </View>
-            <View style={styles.deviceInfo}>
-              <Text style={styles.deviceName}>Feeders</Text>
-              <Text style={styles.deviceStatus}>{status.feeders.count} active • Fed {status.feeders.lastFeeding}</Text>
-            </View>
-            <Text style={styles.deviceArrow}>›</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.deviceCard}>
-            <View style={styles.deviceIcon}>
-              <Text style={styles.iconText}>💧</Text>
-            </View>
-            <View style={styles.deviceInfo}>
-              <Text style={styles.deviceName}>Water Dispenser</Text>
-              <Text style={styles.deviceStatus}>{status.water.level}% full • {status.water.lastDispense}</Text>
-            </View>
-            <View style={[styles.levelBar, { width: `${status.water.level}%` }]} />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.deviceCard}>
-            <View style={styles.deviceIcon}>
-              <Text style={styles.iconText}>📹</Text>
-            </View>
-            <View style={styles.deviceInfo}>
-              <Text style={styles.deviceName}>Cameras</Text>
-              <Text style={styles.deviceStatus}>{status.cameras.online}/{status.cameras.total} online</Text>
-            </View>
-            <Text style={styles.deviceArrow}>›</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.deviceCard}>
-            <View style={styles.deviceIcon}>
-              <Text style={styles.iconText}>📍</Text>
-            </View>
-            <View style={styles.deviceInfo}>
-              <Text style={styles.deviceName}>GPS Tracker</Text>
-              <Text style={styles.deviceStatus}>Last update: 5 min ago</Text>
-            </View>
-            <Text style={styles.deviceArrow}>›</Text>
+          <TouchableOpacity style={styles.secondaryBtn} onPress={savePetName} disabled={savingPet}>
+            <Text style={styles.secondaryBtnText}>{savingPet ? 'Saving…' : 'Save name'}</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Quick Actions */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>⚡ Quick Actions</Text>
-          <View style={styles.actions}>
-            <TouchableOpacity style={styles.actionButton}>
-              <Text style={styles.actionIcon}>🍖</Text>
-              <Text style={styles.actionText}>Feed Now</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton}>
-              <Text style={styles.actionIcon}>💧</Text>
-              <Text style={styles.actionText}>Dispense Water</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton}>
-              <Text style={styles.actionIcon}>📹</Text>
-              <Text style={styles.actionText}>View Cams</Text>
-            </TouchableOpacity>
-          </View>
+        <View style={styles.card}>
+          <Text style={styles.label}>Claim feeder</Text>
+          <Text style={styles.hint}>Paste the claim code from the device. MQTT credentials are ignored.</Text>
+          <TextInput
+            style={styles.input}
+            value={claimCode}
+            onChangeText={setClaimCode}
+            placeholder="Claim code"
+            placeholderTextColor={COLORS.textMuted}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          <TouchableOpacity
+            style={[styles.primaryBtn, claiming && styles.btnDisabled]}
+            onPress={claim}
+            disabled={claiming}
+          >
+            <Text style={styles.primaryBtnText}>{claiming ? 'Claiming…' : 'Claim'}</Text>
+          </TouchableOpacity>
         </View>
+
+        {statusNote ? <Text style={styles.error}>{statusNote}</Text> : null}
+
+        <Text style={styles.sectionTitle}>Feeders</Text>
+        {!isLoggedIn ? (
+          <Text style={styles.hint}>Log in from Settings to load claimed feeders.</Text>
+        ) : devices.length === 0 ? (
+          <Text style={styles.hint}>No feeders claimed yet.</Text>
+        ) : (
+          devices.map((device) => {
+            const offline = isDeviceOffline(device);
+            const low = isFoodLow(device);
+            return (
+              <View key={device.id} style={styles.deviceCard}>
+                <View style={styles.deviceHeader}>
+                  <Text style={styles.deviceName}>{device.name}</Text>
+                  <View style={styles.statusBadge}>
+                    <View
+                      style={[
+                        styles.statusDot,
+                        { backgroundColor: offline ? COLORS.offline : COLORS.online },
+                      ]}
+                    />
+                    <Text style={styles.statusText}>{offline ? 'offline' : 'online'}</Text>
+                  </View>
+                </View>
+                <Text style={[styles.levelText, low && { color: COLORS.danger }]}>
+                  Food {device.foodLevel}%{low ? ' · low' : ''}
+                </Text>
+              </View>
+            );
+          })
+        )}
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function QuickStatusCard({ icon, value, label, status }: { icon: string; value: string; label: string; status: string }) {
-  const statusColor = status === 'normal' ? '#22c55e' : status === 'warning' ? '#f59e0b' : '#ef4444';
-  
-  return (
-    <View style={styles.quickCard}>
-      <Text style={styles.quickIcon}>{icon}</Text>
-      <Text style={[styles.quickValue, { color: statusColor }]}>{value}</Text>
-      <Text style={styles.quickLabel}>{label}</Text>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
-  content: { padding: 16 },
-  title: { fontSize: 28, fontWeight: 'bold', marginBottom: 4 },
-  subtitle: { fontSize: 14, color: '#666', marginBottom: 20 },
-  loading: { textAlign: 'center', marginTop: 50 },
-  quickStatus: { flexDirection: 'row', gap: 12, marginBottom: 24 },
-  quickCard: { flex: 1, backgroundColor: '#fff', borderRadius: 16, padding: 16, alignItems: 'center', elevation: 2 },
-  quickIcon: { fontSize: 28, marginBottom: 8 },
-  quickValue: { fontSize: 18, fontWeight: 'bold' },
-  quickLabel: { fontSize: 12, color: '#666', marginTop: 4 },
-  section: { marginBottom: 24 },
-  sectionTitle: { fontSize: 18, fontWeight: '600', marginBottom: 12 },
-  deviceCard: { backgroundColor: '#fff', borderRadius: 12, padding: 16, flexDirection: 'row', alignItems: 'center', marginBottom: 8, elevation: 2 },
-  deviceIcon: { width: 48, height: 48, backgroundColor: '#f0f0f0', borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  iconText: { fontSize: 24 },
-  deviceInfo: { flex: 1, marginLeft: 12 },
-  deviceName: { fontSize: 16, fontWeight: '600' },
-  deviceStatus: { fontSize: 12, color: '#666', marginTop: 2 },
-  deviceArrow: { fontSize: 24, color: '#ccc' },
-  levelBar: { position: 'absolute', left: 0, bottom: 0, height: 4, backgroundColor: '#3b82f6', borderBottomLeftRadius: 12, borderBottomRightRadius: 12 },
-  actions: { flexDirection: 'row', gap: 12 },
-  actionButton: { flex: 1, backgroundColor: '#fff', padding: 16, borderRadius: 12, alignItems: 'center', elevation: 2 },
-  actionIcon: { fontSize: 28, marginBottom: 4 },
-  actionText: { fontSize: 12, color: '#666' },
+  container: { flex: 1, backgroundColor: COLORS.background },
+  content: { padding: SPACING.lg, paddingBottom: SPACING.xl },
+  title: { fontSize: 28, fontWeight: '700', color: COLORS.text },
+  subtitle: { fontSize: 14, color: COLORS.textMuted, marginTop: 2, marginBottom: SPACING.md },
+  card: {
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.md,
+    marginBottom: SPACING.sm,
+    ...SHADOWS.small,
+  },
+  label: { fontSize: 16, fontWeight: '600', color: COLORS.text, marginBottom: 4 },
+  hint: { fontSize: 13, color: COLORS.textMuted, marginBottom: SPACING.sm },
+  input: {
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    fontSize: 16,
+    color: COLORS.text,
+    backgroundColor: COLORS.surfaceSecondary,
+    marginBottom: SPACING.sm,
+  },
+  primaryBtn: {
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.md,
+    paddingVertical: SPACING.sm,
+    alignItems: 'center',
+  },
+  primaryBtnText: { color: '#fff', fontWeight: '600', fontSize: 16 },
+  secondaryBtn: {
+    backgroundColor: COLORS.surfaceSecondary,
+    borderRadius: RADIUS.md,
+    paddingVertical: SPACING.sm,
+    alignItems: 'center',
+  },
+  secondaryBtnText: { color: COLORS.primary, fontWeight: '600' },
+  btnDisabled: { opacity: 0.6 },
+  error: { color: COLORS.danger, marginBottom: SPACING.sm },
+  sectionTitle: { fontSize: 16, fontWeight: '600', color: COLORS.text, marginTop: SPACING.md, marginBottom: SPACING.sm },
+  deviceCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.md,
+    marginBottom: SPACING.sm,
+    ...SHADOWS.small,
+  },
+  deviceHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  deviceName: { fontSize: 16, fontWeight: '600', color: COLORS.text },
+  statusBadge: { flexDirection: 'row', alignItems: 'center' },
+  statusDot: { width: 6, height: 6, borderRadius: 3, marginRight: 6 },
+  statusText: { fontSize: 12, color: COLORS.textMuted, textTransform: 'capitalize' },
+  levelText: { fontSize: 13, color: COLORS.textSecondary, marginTop: 6 },
 });

@@ -1,12 +1,64 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Switch } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  SafeAreaView,
+  Switch,
+  TextInput,
+  Alert,
+} from 'react-native';
 import { COLORS, SPACING, RADIUS, SHADOWS } from '../constants';
+import { api, errorMessage } from '../services/api';
+import { useSession } from '../lib/useSession';
+import type { User } from '../types';
 
 export const SettingsScreen: React.FC = () => {
-  const [notifications, setNotifications] = React.useState(true);
+  const { isLoggedIn } = useSession();
   const [lowFoodAlerts, setLowFoodAlerts] = React.useState(true);
-  const [lowWaterAlerts, setLowWaterAlerts] = React.useState(true);
-  const [geofenceAlerts, setGeofenceAlerts] = React.useState(true);
+  const [email, setEmail] = React.useState('');
+  const [password, setPassword] = React.useState('');
+  const [user, setUser] = React.useState<User | null>(null);
+  const [busy, setBusy] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!isLoggedIn) {
+      setUser(null);
+      return;
+    }
+    api
+      .me()
+      .then(setUser)
+      .catch(() => setUser({ email }));
+  }, [isLoggedIn, email]);
+
+  const login = async () => {
+    if (!email.trim() || !password) {
+      Alert.alert('Sign in', 'Email and password are required.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const next = await api.login(email.trim(), password);
+      setUser(next);
+      setPassword('');
+    } catch (err) {
+      Alert.alert('Login failed', errorMessage(err, 'Could not sign in'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const logout = () => {
+    api.logout();
+    setUser(null);
+    setPassword('');
+  };
+
+  const displayName = user?.name || user?.email || email || 'Owner';
+  const initial = displayName.charAt(0).toUpperCase();
 
   return (
     <SafeAreaView style={styles.container}>
@@ -14,45 +66,62 @@ export const SettingsScreen: React.FC = () => {
         <Text style={styles.title}>⚙️ Settings</Text>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Profile Section */}
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <View style={styles.card}>
-          <View style={styles.profileRow}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>M</Text>
-            </View>
-            <View style={styles.profileInfo}>
-              <Text style={styles.profileName}>Marco</Text>
-              <Text style={styles.profileEmail}>marco@test.com</Text>
-            </View>
-          </View>
-          <TouchableOpacity style={styles.editButton}>
-            <Text style={styles.editButtonText}>Edit</Text>
-          </TouchableOpacity>
+          {isLoggedIn ? (
+            <>
+              <View style={styles.profileRow}>
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>{initial}</Text>
+                </View>
+                <View style={styles.profileInfo}>
+                  <Text style={styles.profileName}>{displayName}</Text>
+                  <Text style={styles.profileEmail}>{user?.email || 'Signed in'}</Text>
+                </View>
+              </View>
+              <TouchableOpacity style={styles.logoutButton} onPress={logout}>
+                <Text style={styles.logoutButtonText}>Log out</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <Text style={styles.settingLabel}>Owner login</Text>
+              <Text style={styles.settingDesc}>JWT is kept in memory for this session only.</Text>
+              <TextInput
+                style={styles.input}
+                value={email}
+                onChangeText={setEmail}
+                placeholder="Email"
+                placeholderTextColor={COLORS.textMuted}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="email-address"
+              />
+              <TextInput
+                style={styles.input}
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Password"
+                placeholderTextColor={COLORS.textMuted}
+                secureTextEntry
+              />
+              <TouchableOpacity
+                style={[styles.loginButton, busy && styles.btnDisabled]}
+                onPress={login}
+                disabled={busy}
+              >
+                <Text style={styles.loginButtonText}>{busy ? 'Signing in…' : 'Log in'}</Text>
+              </TouchableOpacity>
+            </>
+          )}
         </View>
 
-        {/* Notifications */}
-        <Text style={styles.sectionTitle}>Notifications</Text>
+        <Text style={styles.sectionTitle}>Preferences</Text>
         <View style={styles.card}>
-          <View style={styles.settingRow}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Push Notifications</Text>
-              <Text style={styles.settingDesc}>Receive alerts on your device</Text>
-            </View>
-            <Switch
-              value={notifications}
-              onValueChange={setNotifications}
-              trackColor={{ false: COLORS.surfaceSecondary, true: COLORS.primaryLight }}
-              thumbColor="#fff"
-            />
-          </View>
-          
-          <View style={styles.divider} />
-          
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
               <Text style={styles.settingLabel}>Low Food Alerts</Text>
-              <Text style={styles.settingDesc}>Alert when food is below 20%</Text>
+              <Text style={styles.settingDesc}>Local preference only. Alert when food is below 20%.</Text>
             </View>
             <Switch
               value={lowFoodAlerts}
@@ -61,83 +130,8 @@ export const SettingsScreen: React.FC = () => {
               thumbColor="#fff"
             />
           </View>
-          
-          <View style={styles.divider} />
-          
-          <View style={styles.settingRow}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Low Water Alerts</Text>
-              <Text style={styles.settingDesc}>Alert when water is below 20%</Text>
-            </View>
-            <Switch
-              value={lowWaterAlerts}
-              onValueChange={setLowWaterAlerts}
-              trackColor={{ false: COLORS.surfaceSecondary, true: COLORS.primaryLight }}
-              thumbColor="#fff"
-            />
-          </View>
-          
-          <View style={styles.divider} />
-          
-          <View style={styles.settingRow}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Geofence Alerts</Text>
-              <Text style={styles.settingDesc}>Alert when pet leaves safe zone</Text>
-            </View>
-            <Switch
-              value={geofenceAlerts}
-              onValueChange={setGeofenceAlerts}
-              trackColor={{ false: COLORS.surfaceSecondary, true: COLORS.primaryLight }}
-              thumbColor="#fff"
-            />
-          </View>
         </View>
 
-        {/* Device Settings */}
-        <Text style={styles.sectionTitle}>Device</Text>
-        <View style={styles.card}>
-          <TouchableOpacity style={styles.menuRow}>
-            <Text style={styles.menuLabel}>Refresh Interval</Text>
-            <View style={styles.menuRight}>
-              <Text style={styles.menuValue}>30 sec</Text>
-              <Text style={styles.menuArrow}>›</Text>
-            </View>
-          </TouchableOpacity>
-          
-          <View style={styles.divider} />
-          
-          <TouchableOpacity style={styles.menuRow}>
-            <Text style={styles.menuLabel}>Battery Saver Mode</Text>
-            <View style={styles.menuRight}>
-              <Text style={styles.menuValue}>Off</Text>
-              <Text style={styles.menuArrow}>›</Text>
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        {/* Account */}
-        <Text style={styles.sectionTitle}>Account</Text>
-        <View style={styles.card}>
-          <TouchableOpacity style={styles.menuRow}>
-            <Text style={styles.menuLabel}>Change Password</Text>
-            <Text style={styles.menuArrow}>›</Text>
-          </TouchableOpacity>
-          
-          <View style={styles.divider} />
-          
-          <TouchableOpacity style={styles.menuRow}>
-            <Text style={styles.menuLabel}>Help & Support</Text>
-            <Text style={styles.menuArrow}>›</Text>
-          </TouchableOpacity>
-          
-          <View style={styles.divider} />
-          
-          <TouchableOpacity style={styles.menuRow}>
-            <Text style={[styles.menuLabel, { color: COLORS.danger }]}>Log Out</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Version */}
         <Text style={styles.version}>Smart Pet v1.0.0</Text>
       </ScrollView>
     </SafeAreaView>
@@ -201,16 +195,43 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     marginTop: 2,
   },
-  editButton: {
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs,
+  logoutButton: {
+    marginTop: SPACING.md,
+    paddingVertical: SPACING.sm,
     backgroundColor: COLORS.surfaceSecondary,
     borderRadius: RADIUS.md,
+    alignItems: 'center',
   },
-  editButtonText: {
+  logoutButtonText: {
     fontSize: 14,
-    color: COLORS.primary,
-    fontWeight: '500',
+    color: COLORS.danger,
+    fontWeight: '600',
+  },
+  loginButton: {
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.md,
+    paddingVertical: SPACING.sm,
+    alignItems: 'center',
+  },
+  loginButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  btnDisabled: {
+    opacity: 0.6,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    fontSize: 16,
+    color: COLORS.text,
+    backgroundColor: COLORS.surfaceSecondary,
+    marginTop: SPACING.sm,
+    marginBottom: SPACING.sm,
   },
   sectionTitle: {
     fontSize: 14,
@@ -228,6 +249,7 @@ const styles = StyleSheet.create({
   },
   settingInfo: {
     flex: 1,
+    paddingRight: SPACING.md,
   },
   settingLabel: {
     fontSize: 16,
@@ -238,34 +260,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: COLORS.textMuted,
     marginTop: 2,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: COLORS.border,
-    marginVertical: SPACING.xs,
-  },
-  menuRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: SPACING.xs,
-  },
-  menuLabel: {
-    fontSize: 16,
-    color: COLORS.text,
-  },
-  menuRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  menuValue: {
-    fontSize: 14,
-    color: COLORS.textMuted,
-    marginRight: SPACING.xs,
-  },
-  menuArrow: {
-    fontSize: 20,
-    color: COLORS.textMuted,
+    marginBottom: SPACING.xs,
   },
   version: {
     textAlign: 'center',
