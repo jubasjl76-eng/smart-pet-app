@@ -1,7 +1,7 @@
 export interface Device {
   id: string;
   name: string;
-  foodLevel: number;
+  foodLevel: number | null;
   status: string;
 }
 

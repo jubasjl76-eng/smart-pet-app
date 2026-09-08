@@ -13,11 +13,23 @@ import {
 import { COLORS, SPACING, RADIUS, SHADOWS } from '../constants';
 import { api, errorMessage } from '../services/api';
 import { useSession } from '../lib/useSession';
+import { initPreferences, getLowFoodAlertsEnabled, setLowFoodAlertsEnabled } from '../lib/preferences';
 import type { User } from '../types';
 
 export const SettingsScreen: React.FC = () => {
   const { isLoggedIn } = useSession();
   const [lowFoodAlerts, setLowFoodAlerts] = React.useState(true);
+
+  React.useEffect(() => {
+    initPreferences().then(() => {
+      setLowFoodAlerts(getLowFoodAlertsEnabled());
+    });
+  }, []);
+
+  const onToggleLowFoodAlerts = (value: boolean) => {
+    setLowFoodAlerts(value);
+    setLowFoodAlertsEnabled(value);
+  };
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [user, setUser] = React.useState<User | null>(null);
@@ -121,11 +133,11 @@ export const SettingsScreen: React.FC = () => {
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
               <Text style={styles.settingLabel}>Low Food Alerts</Text>
-              <Text style={styles.settingDesc}>Local preference only. Alert when food is below 20%.</Text>
+              <Text style={styles.settingDesc}>Show in-app low-food indicators when food is below 20%.</Text>
             </View>
             <Switch
               value={lowFoodAlerts}
-              onValueChange={setLowFoodAlerts}
+              onValueChange={onToggleLowFoodAlerts}
               trackColor={{ false: COLORS.surfaceSecondary, true: COLORS.primaryLight }}
               thumbColor="#fff"
             />

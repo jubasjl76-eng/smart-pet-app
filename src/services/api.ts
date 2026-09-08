@@ -6,6 +6,7 @@
 import axios, { AxiosInstance } from 'axios';
 import { discoverBackend } from '../lib/backend';
 import { getToken, setToken, clearToken } from '../lib/session';
+import { loadPetName, savePetName } from '../lib/storage';
 import type { Device, Schedule, User } from '../types';
 
 function unwrapList(data: unknown): unknown[] {
@@ -30,7 +31,15 @@ export function normalizeDevice(raw: unknown): Device {
   const src = Object.keys(nested).length ? { ...r, ...nested } : r;
   const id = String(src.id ?? src._id ?? src.deviceId ?? '');
   const foodLevelRaw = src.foodLevel ?? src.food_level;
-  const foodLevel = typeof foodLevelRaw === 'number' ? foodLevelRaw : Number(foodLevelRaw ?? 0) || 0;
+  let foodLevel: number | null = null;
+  if (typeof foodLevelRaw === 'number') {
+    foodLevel = foodLevelRaw;
+  } else if (foodLevelRaw != null && foodLevelRaw !== '') {
+    const parsed = Number(foodLevelRaw);
+    if (!Number.isNaN(parsed)) {
+      foodLevel = parsed;
+    }
+  }
   let status: string;
   if (typeof src.status === 'string' && src.status.length) {
     status = src.status;
@@ -52,7 +61,7 @@ export function isDeviceOffline(device: Device): boolean {
 }
 
 export function isFoodLow(device: Device): boolean {
-  return device.foodLevel < 20;
+  return typeof device.foodLevel === 'number' && device.foodLevel < 20;
 }
 
 export function normalizeSchedule(raw: unknown): Schedule {
@@ -196,32 +205,47 @@ export const api = {
     await c.delete(`/api/schedules/${id}`);
   },
 
-  async getPet(): Promise<{ name?: string } | null> {
+  async getPet(): Promise<{ name?: string; fromLocal?: boolean } | null> {
     try {
       const c = await getClient();
       const res = await c.get('/api/pet');
       const body = asRecord(res.data);
       const pet = asRecord(body.pet);
       const name = String(pet.name ?? body.name ?? '');
+      if (name) {
+        savePetName(name).catch(() => {});
+      }
       return { name: name || undefined };
     } catch (err: unknown) {
       const status = (err as { response?: { status?: number } })?.response?.status;
-      if (status === 404) return null;
+      if (status === 404) {
+        const local = await loadPetName();
+        return local ? { name: local, fromLocal: true } : null;
+      }
       throw err;
     }
   },
 
-  async putPet(name: string): Promise<{ name?: string } | null> {
+  async putPet(name: string): Promise<{ name?: string; fromLocal?: boolean } | null> {
     try {
       const c = await getClient();
       const res = await c.put('/api/pet', { name });
       const body = asRecord(res.data);
-      return { name: String(asRecord(body.pet).name ?? body.name ?? name) };
+      const savedName = String(asRecord(body.pet).name ?? body.name ?? name);
+      savePetName(savedName).catch(() => {});
+      return { name: savedName };
     } catch (err: unknown) {
       const status = (err as { response?: { status?: number } })?.response?.status;
-      if (status === 404) return null;
+      if (status === 404) {
+        await savePetName(name);
+        return { name, fromLocal: true };
+      }
       throw err;
     }
+  },
+
+  async loadLocalPetName(): Promise<string | null> {
+    return loadPetName();
   },
 };
 

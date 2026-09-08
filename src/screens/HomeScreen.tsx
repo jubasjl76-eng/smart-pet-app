@@ -2,7 +2,7 @@
  * Home — pet name + claim code. No onboard funnel.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,15 +12,21 @@ import {
   RefreshControl,
   TextInput,
   Alert,
+  AppState,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS, SPACING, RADIUS, SHADOWS } from '../constants';
 import { api, errorMessage, isDeviceOffline, isFoodLow } from '../services/api';
 import { useSession } from '../lib/useSession';
+import { useLowFoodAlerts } from '../lib/usePreferences';
 import type { Device } from '../types';
 
+const POLL_INTERVAL = 30000;
+
 export function HomeScreen() {
-  const { isLoggedIn } = useSession();
+  const { isLoggedIn, ready } = useSession();
+  const lowFoodAlertsEnabled = useLowFoodAlerts();
   const [petName, setPetName] = useState('');
   const [claimCode, setClaimCode] = useState('');
   const [devices, setDevices] = useState<Device[]>([]);
@@ -28,17 +34,12 @@ export function HomeScreen() {
   const [savingPet, setSavingPet] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [statusNote, setStatusNote] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const load = useCallback(async () => {
+  const loadDevices = useCallback(async () => {
     if (!isLoggedIn) {
       setDevices([]);
       return;
-    }
-    try {
-      const pet = await api.getPet();
-      if (pet?.name) setPetName(pet.name);
-    } catch {
-      // GET /api/pet may 404 — keep local name
     }
     try {
       setDevices(await api.getDevices());
@@ -47,9 +48,42 @@ export function HomeScreen() {
     }
   }, [isLoggedIn]);
 
+  const loadPetName = useCallback(async () => {
+    if (!isLoggedIn) return;
+    try {
+      const pet = await api.getPet();
+      if (pet?.name) setPetName(pet.name);
+    } catch {
+      const local = await api.loadLocalPetName();
+      if (local) setPetName(local);
+    }
+  }, [isLoggedIn]);
+
+  const load = useCallback(async () => {
+    await loadPetName();
+    await loadDevices();
+  }, [loadPetName, loadDevices]);
+
   useEffect(() => {
-    load();
-  }, [load]);
+    if (ready) {
+      load();
+    }
+  }, [ready, load]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!isLoggedIn) return;
+      loadDevices();
+      pollRef.current = setInterval(loadDevices, POLL_INTERVAL);
+      const sub = AppState.addEventListener('change', (state) => {
+        if (state === 'active') loadDevices();
+      });
+      return () => {
+        if (pollRef.current) clearInterval(pollRef.current);
+        sub.remove();
+      };
+    }, [isLoggedIn, loadDevices])
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -64,8 +98,8 @@ export function HomeScreen() {
     setSavingPet(true);
     try {
       await api.putPet(name);
-    } catch {
-      // local fallback if GET/PUT /api/pet 404s
+    } catch (err) {
+      Alert.alert('Save failed', errorMessage(err, 'Could not save pet name'));
     } finally {
       setSavingPet(false);
     }
@@ -152,6 +186,7 @@ export function HomeScreen() {
           devices.map((device) => {
             const offline = isDeviceOffline(device);
             const low = isFoodLow(device);
+            const showLow = low && lowFoodAlertsEnabled;
             return (
               <View key={device.id} style={styles.deviceCard}>
                 <View style={styles.deviceHeader}>
@@ -166,8 +201,8 @@ export function HomeScreen() {
                     <Text style={styles.statusText}>{offline ? 'offline' : 'online'}</Text>
                   </View>
                 </View>
-                <Text style={[styles.levelText, low && { color: COLORS.danger }]}>
-                  Food {device.foodLevel}%{low ? ' · low' : ''}
+                <Text style={[styles.levelText, showLow && { color: COLORS.danger }]}>
+                  Food {device.foodLevel != null ? `${device.foodLevel}%` : '—'}{showLow ? ' · low' : ''}
                 </Text>
               </View>
             );

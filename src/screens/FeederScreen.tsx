@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,24 +9,32 @@ import {
   RefreshControl,
   TextInput,
   Alert,
+  AppState,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { COLORS, SPACING, RADIUS, SHADOWS } from '../constants';
 import { ScheduleCard } from '../components';
 import { api, errorMessage, isDeviceOffline, isFoodLow } from '../services/api';
 import { useSession } from '../lib/useSession';
+import { useLowFoodAlerts } from '../lib/usePreferences';
 import type { Device, Schedule } from '../types';
+
+const POLL_INTERVAL = 30000;
 
 export const FeederScreen: React.FC = () => {
   const { isLoggedIn } = useSession();
+  const lowFoodAlertsEnabled = useLowFoodAlerts();
   const [devices, setDevices] = useState<Device[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [feeding, setFeeding] = useState(false);
   const [feedError, setFeedError] = useState<string | null>(null);
+  const [feedSuccess, setFeedSuccess] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [hour, setHour] = useState('8');
   const [minute, setMinute] = useState('0');
   const [savingSchedule, setSavingSchedule] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const selected = devices.find((d) => d.id === selectedId) ?? devices[0];
 
@@ -42,6 +50,15 @@ export const FeederScreen: React.FC = () => {
     setSelectedId((prev) => (prev && next.some((d) => d.id === prev) ? prev : next[0]?.id ?? null));
   }, [isLoggedIn]);
 
+  const loadSchedules = useCallback(async (deviceId: string) => {
+    if (!isLoggedIn || !deviceId) return;
+    try {
+      setSchedules(await api.getSchedules(deviceId));
+    } catch (err) {
+      setFeedError(errorMessage(err, 'Could not load schedules'));
+    }
+  }, [isLoggedIn]);
+
   useEffect(() => {
     loadDevices().catch((err) => setFeedError(errorMessage(err, 'Could not load feeders')));
   }, [loadDevices]);
@@ -51,17 +68,34 @@ export const FeederScreen: React.FC = () => {
       setSchedules([]);
       return;
     }
-    api
-      .getSchedules(selectedId)
-      .then(setSchedules)
-      .catch((err) => setFeedError(errorMessage(err, 'Could not load schedules')));
-  }, [isLoggedIn, selectedId]);
+    loadSchedules(selectedId);
+  }, [isLoggedIn, selectedId, loadSchedules]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!isLoggedIn) return;
+      loadDevices().catch(() => {});
+      pollRef.current = setInterval(() => {
+        loadDevices().catch(() => {});
+      }, POLL_INTERVAL);
+      const sub = AppState.addEventListener('change', (state) => {
+        if (state === 'active') loadDevices().catch(() => {});
+      });
+      return () => {
+        if (pollRef.current) clearInterval(pollRef.current);
+        sub.remove();
+      };
+    }, [isLoggedIn, loadDevices])
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);
     setFeedError(null);
     try {
       await loadDevices();
+      if (selected?.id) {
+        await loadSchedules(selected.id);
+      }
     } catch (err) {
       setFeedError(errorMessage(err, 'Could not load feeders'));
     } finally {
@@ -76,8 +110,12 @@ export const FeederScreen: React.FC = () => {
     }
     setFeeding(true);
     setFeedError(null);
+    setFeedSuccess(false);
     try {
       await api.feedNow(selected.id);
+      setFeedSuccess(true);
+      setTimeout(() => setFeedSuccess(false), 3000);
+      await loadDevices();
     } catch (err) {
       const msg = errorMessage(err, 'Feed failed');
       setFeedError(msg);
@@ -127,14 +165,15 @@ export const FeederScreen: React.FC = () => {
     }
   };
 
-  const getFoodColor = (level: number) => {
+  const getFoodColor = (level: number | null) => {
+    if (level == null) return COLORS.textMuted;
     if (level < 20) return COLORS.danger;
     if (level < 50) return COLORS.warning;
     return COLORS.success;
   };
 
   const onlineCount = devices.filter((d) => !isDeviceOffline(d)).length;
-  const lowCount = devices.filter((d) => isFoodLow(d)).length;
+  const lowCount = lowFoodAlertsEnabled ? devices.filter((d) => isFoodLow(d)).length : 0;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -150,14 +189,15 @@ export const FeederScreen: React.FC = () => {
         keyboardShouldPersistTaps="handled"
       >
         <TouchableOpacity
-          style={[styles.feedButton, feeding && styles.feedButtonActive]}
+          style={[styles.feedButton, feeding && styles.feedButtonActive, feedSuccess && styles.feedButtonSuccess]}
           onPress={handleFeed}
           disabled={feeding}
         >
-          <Text style={styles.feedButtonIcon}>🍖</Text>
-          <Text style={styles.feedButtonText}>{feeding ? 'Feeding...' : 'Feed Now'}</Text>
+          <Text style={styles.feedButtonIcon}>{feedSuccess ? '✓' : '🍖'}</Text>
+          <Text style={styles.feedButtonText}>{feeding ? 'Feeding...' : feedSuccess ? 'Fed!' : 'Feed Now'}</Text>
         </TouchableOpacity>
         {feedError ? <Text style={styles.error}>{feedError}</Text> : null}
+        {feedSuccess ? <Text style={styles.success}>Feeding acknowledged by device</Text> : null}
         {!isLoggedIn ? <Text style={styles.hint}>Log in from Settings to feed and schedule.</Text> : null}
 
         <Text style={styles.sectionTitle}>Your Feeders</Text>
@@ -193,14 +233,14 @@ export const FeederScreen: React.FC = () => {
                       style={[
                         styles.levelFill,
                         {
-                          width: `${Math.max(0, Math.min(100, feeder.foodLevel))}%`,
-                          backgroundColor: getFoodColor(feeder.foodLevel),
+                          width: feeder.foodLevel != null ? `${Math.max(0, Math.min(100, feeder.foodLevel))}%` : '0%',
+                          backgroundColor: feeder.foodLevel != null ? getFoodColor(feeder.foodLevel) : COLORS.textMuted,
                         },
                       ]}
                     />
                   </View>
-                  <Text style={[styles.levelText, { color: getFoodColor(feeder.foodLevel) }]}>
-                    {feeder.foodLevel}%
+                  <Text style={[styles.levelText, { color: feeder.foodLevel != null ? getFoodColor(feeder.foodLevel) : COLORS.textMuted }]}>
+                    {feeder.foodLevel != null ? `${feeder.foodLevel}%` : '—'}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -302,6 +342,14 @@ const styles = StyleSheet.create({
   },
   feedButtonActive: {
     backgroundColor: COLORS.primaryDark,
+  },
+  feedButtonSuccess: {
+    backgroundColor: COLORS.success,
+  },
+  success: {
+    color: COLORS.success,
+    marginBottom: SPACING.sm,
+    fontWeight: '500',
   },
   feedButtonIcon: {
     fontSize: 32,
