@@ -1,3 +1,5 @@
+import './src/instrument'; // Sentry — before the app
+
 import { registerRootComponent } from 'expo';
 
 import App from './App';
