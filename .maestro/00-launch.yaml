@@ -1,0 +1,9 @@
+appId: com.marcofolgado76.smart-pet-app
+name: App launches to the Home tab
+---
+- launchApp:
+    clearState: true
+- assertVisible: "Home"
+- assertVisible: "Food"
+- assertVisible: "Water"
+- assertVisible: "Settings"
