@@ -1,0 +1,11 @@
+appId: com.marcofolgado76.smart-pet-app
+name: Settings shows the sign-in form when logged out
+---
+- launchApp:
+    clearState: true
+- tapOn: "Settings"
+- assertVisible: "Email"
+- tapOn: "Email"
+- inputText: "owner@smartpet.local"
+- assertVisible:
+    text: "owner@smartpet.local"

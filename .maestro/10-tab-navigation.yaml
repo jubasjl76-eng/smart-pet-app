@@ -1,0 +1,12 @@
+appId: com.marcofolgado76.smart-pet-app
+name: Bottom tabs switch screens
+---
+- launchApp
+- tapOn: "Food"
+- assertVisible: "Food"
+- tapOn: "Water"
+- assertVisible: "Water"
+- tapOn: "Settings"
+- assertVisible: "Settings"
+- tapOn: "Home"
+- assertVisible: "Home"

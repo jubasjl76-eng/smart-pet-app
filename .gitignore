@@ -40,3 +40,9 @@ yarn-error.*
 /ios
 /android
 graphify-out/
+
+# Jest
+/coverage/
+
+# Maestro
+.maestro/**/*.log
